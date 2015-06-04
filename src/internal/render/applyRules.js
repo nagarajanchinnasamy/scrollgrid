@@ -57,7 +57,20 @@
                 if (ruleDefinition.foregroundStyle) {
                     data[i].foregroundStyle += " " + ruleDefinition.foregroundStyle;
                 }
-
+                if (ruleDefinition.backgroundRender) {
+                    data[i].renderStack[0] = ruleDefinition.backgroundRender;
+                }
+                if (ruleDefinition.foregroundRender) {
+                    data[i].renderStack[1] = ruleDefinition.foregroundRender;
+                }
+                if (ruleDefinition.textRender) {
+                    data[i].renderStack[2] = ruleDefinition.textRender;
+                }
+                if (ruleDefinition.fullRender) {
+                    data[i].renderStack = []
+                        .concat(ruleDefinition.fullRender)
+                        .concat(render.renderSortIcon);
+                }
             }
         }
     };

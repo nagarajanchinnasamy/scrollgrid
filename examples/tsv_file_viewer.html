@@ -48,7 +48,22 @@
                 { row: "*", column: "*", columnWidth: 100 },
                 { row: "*", column: "2", alignment: 'left' },
                 { row: "*", column: "3", alignment: 'right' },
-                { row: "*", column: "4", alignment: 'center' }
+                { row: "*", column: "4", alignment: 'center' },
+                { row: "*", column: "3", foregroundRender:  function (target, cellData, add) {
+                    var selector = "sg-no-style--background-selector";
+                    if (add) {
+                        target.append("circle");
+                    } else {
+                        target
+                                .selectAll("circle")
+                                .attr("r", Math.min(cellData.boxWidth / 2, cellData.boxHeight / 2))
+                                .attr("cx", cellData.boxWidth / 2)
+                                .attr("cy", cellData.boxHeight / 2)
+                                .attr("width", cellData.boxWidth)
+                                .attr("height", cellData.boxHeight)
+                                .style("fill", "red");
+                    }
+                }}
             ]
         });
         d3.tsv("/examples/data/example_data.tsv", function (data) {

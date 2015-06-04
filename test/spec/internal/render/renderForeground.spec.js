@@ -132,6 +132,14 @@ define(['d3', 'scrollgrid_actual', 'scrollgrid_mock'], function (d3, actual, moc
                 expect(render.renderSortIcon).toHaveBeenCalledWith(datum, group, true);
             });
 
+            it("should call exit on the selection", function () {
+                expect(selection.exit).toHaveBeenCalled();
+            });
+
+            it("should call remove on the selection", function () {
+                expect(selection.remove).toHaveBeenCalled();
+            });
+
         });
 
     });

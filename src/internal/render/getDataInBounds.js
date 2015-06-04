@@ -51,7 +51,13 @@
                     columnIndex: c,
                     column: column,
                     formatter: null,
-                    getValue: getValue
+                    getValue: getValue,
+                    renderStack: [
+                        render.renderBackground,
+                        render.renderForeground,
+                        render.renderText,
+                        render.renderSortIcon
+                    ]
                 };
                 runningX += column.width;
             }

@@ -575,7 +575,20 @@
                 if (ruleDefinition.foregroundStyle) {
                     data[i].foregroundStyle += " " + ruleDefinition.foregroundStyle;
                 }
-
+                if (ruleDefinition.backgroundRender) {
+                    data[i].renderStack[0] = ruleDefinition.backgroundRender;
+                }
+                if (ruleDefinition.foregroundRender) {
+                    data[i].renderStack[1] = ruleDefinition.foregroundRender;
+                }
+                if (ruleDefinition.textRender) {
+                    data[i].renderStack[2] = ruleDefinition.textRender;
+                }
+                if (ruleDefinition.fullRender) {
+                    data[i].renderStack = []
+                        .concat(ruleDefinition.fullRender)
+                        .concat(render.renderSortIcon);
+                }
             }
         }
     };
@@ -825,7 +838,13 @@
                     columnIndex: c,
                     column: column,
                     formatter: null,
-                    getValue: getValue
+                    getValue: getValue,
+                    renderStack: [
+                        render.renderBackground,
+                        render.renderForeground,
+                        render.renderText,
+                        render.renderSortIcon
+                    ]
                 };
                 runningX += column.width;
             }
@@ -858,13 +877,13 @@
     Scrollgrid.prototype.internal.render.getTextPosition = function (d) {
         var int = this.internal,
             render = int.render,
-            x = d.x;
+            x;
         if (d.alignment === 'center') {
-            x += d.textWidth / 2;
+            x = d.textWidth / 2;
         } else if (d.alignment === 'right') {
-            x += d.textWidth - d.cellPadding;
+            x = d.textWidth - d.cellPadding;
         } else {
-            x += d.cellPadding;
+            x = d.cellPadding;
             if (d.sortIcon && d.sortIcon !== 'none') {
                 x += render.sortIconSize + d.cellPadding;
             }
@@ -950,81 +969,52 @@
     // Copyright: 2015 AlignAlytics
     // License: "https://github.com/PMSI-AlignAlytics/scrollgrid/blob/master/MIT-LICENSE.txt"
     // Source: /src/internal/render/renderBackground.js
-    Scrollgrid.prototype.internal.render.renderBackground = function (g, viewData) {
-
-        var cells;
-
-        cells = g
-            .selectAll(".sg-no-style--background-selector")
-            .data(viewData, function (d) { return d.key; });
-
-        cells.enter()
-            .append("rect")
-            .attr("class", function (d) { return "sg-no-style--background-selector " + d.backgroundStyle; });
-
-        cells.attr("x", function (d) { return d.x; })
-            .attr("y", function (d) { return d.y; })
-            .attr("width", function (d) { return d.boxWidth; })
-            .attr("height", function (d) { return d.boxHeight; });
-
-        cells.exit()
-            .remove();
-
-        return cells;
-
+    Scrollgrid.prototype.internal.render.renderBackground = function (target, cellData, add) {
+        var selector = "sg-no-style--background-selector";
+        if (add) {
+            target.append("rect")
+                .attr("class", selector + " " + cellData.backgroundStyle);
+        } else {
+            target
+                .selectAll("." + selector)
+                .attr("width", cellData.boxWidth)
+                .attr("height", cellData.boxHeight);
+        }
     };
 
     // Copyright: 2015 AlignAlytics
     // License: "https://github.com/PMSI-AlignAlytics/scrollgrid/blob/master/MIT-LICENSE.txt"
-    // Source: /src/internal/render/renderForeground.js
-    Scrollgrid.prototype.internal.render.renderForeground = function (g, viewData) {
-
-        var self = this,
-            int = self.internal,
-            render = int.render,
-            cells;
-
-        g.selectAll(".sg-no-style--sort-icon-selector").remove();
-
-        cells = g
-            .selectAll(".sg-no-style--text-selector")
-            .data(viewData, function (d) { return d.key; });
-
-        cells.enter()
-            .append("text")
-            .attr("class", function (d) { return "sg-no-style--text-selector " + d.foregroundStyle; })
-            .style("text-anchor", function (d) { return render.getTextAnchor.call(self, d); })
-            .attr("dy", "0.35em")
-            .text(render.cellWaitText);
-
-        cells.attr("x", function (d) { return render.getTextPosition.call(self, d); })
-            .attr("y", function (d) { return d.y + d.textHeight / 2; })
-            .each(function (d) {
-                var text = d3.select(this),
-                    sorted = !(!d.sortIcon || d.sortIcon === 'none');
-                render.renderText.call(self, d, text, sorted);
-                render.renderSortIcon.call(self, d, g, sorted);
-            });
-
-        cells.exit()
-            .remove();
-
-        return cells;
-
+    // Source: /src/internal/render/renderCell.js
+    Scrollgrid.prototype.internal.render.renderCell = function (target, datum, add) {
+        var i;
+        if (datum.renderStack && datum.renderStack.length > 0) {
+            for (i = 0; i < datum.renderStack.length; i += 1) {
+                if (datum.renderStack[i]) {
+                    datum.renderStack[i].call(this, target, datum, add);
+                }
+            }
+        }
     };
+
+    // Copyright: 2015 AlignAlytics
+    // License: "https://github.com/PMSI-AlignAlytics/scrollgrid/blob/master/MIT-LICENSE.txt"
+    // Source: /src/internal/render/renderText.js
+    Scrollgrid.prototype.internal.render.renderText = null;
 
     // Copyright: 2015 AlignAlytics
     // License: "https://github.com/PMSI-AlignAlytics/scrollgrid/blob/master/MIT-LICENSE.txt"
     // Source: /src/internal/render/renderRegion.js
     Scrollgrid.prototype.internal.render.renderRegion = function (target, physicalOffset, xVirtual, yVirtual) {
 
-        var int = this.internal,
+        var self = this,
+            int = self.internal,
             render = int.render,
             interaction = int.interaction,
             sizes = int.sizes,
             physical = sizes.physical,
             dom = int.dom,
-            data = render.getDataInBounds.call(this, {
+            cells,
+            viewData = render.getDataInBounds.call(this, {
                 startX: physicalOffset.x || 0,
                 startY: physicalOffset.y || 0,
                 top: yVirtual.top || 0,
@@ -1033,18 +1023,37 @@
                 right: xVirtual.right || 0
             });
 
-        render.renderBackground.call(this, target.content, data);
-        render.renderForeground.call(this, target.content, data);
+        target.content.selectAll(".sg-no-style--sort-icon-selector").remove();
+
+        cells = target.content
+            .selectAll(".sg-no-style--cell-selector")
+            .data(viewData, function (d) { return d.key; });
+
+        cells.enter()
+            .append("g")
+            .attr("class", "sg-no-style--cell-selector")
+            .each(function (d) {
+                render.renderCell.call(self, d3.select(this), d, true);
+            });
+
+        cells
+            .attr("transform", function (d) { return "translate(" + d.x + "," + d.y + ")"; })
+            .each(function (d) {
+                render.renderCell.call(self, d3.select(this), d, false);
+            });
+
+        cells.exit()
+            .remove();
 
         // Add some interaction to the headers
         if (target === dom.top || target === dom.top.left || target === dom.top.right) {
             // Add sorting
             if (interaction.allowSorting) {
-                interaction.addSortButtons.call(this, target.content, data);
+                interaction.addSortButtons.call(this, target.content, viewData);
             }
             // Add column resizing
             if (interaction.allowColumnResizing) {
-                interaction.addResizeHandles.call(this, target.content, data, target === dom.top.right && physical.totalInnerWidth > physical.visibleInnerWidth);
+                interaction.addResizeHandles.call(this, target.content, viewData, target === dom.top.right && physical.totalInnerWidth > physical.visibleInnerWidth);
             }
         }
 
@@ -1053,16 +1062,38 @@
     // Copyright: 2015 AlignAlytics
     // License: "https://github.com/PMSI-AlignAlytics/scrollgrid/blob/master/MIT-LICENSE.txt"
     // Source: /src/internal/render/renderSortIcon.js
-    Scrollgrid.prototype.internal.render.renderSortIcon = function (d, target, sorted) {
+    Scrollgrid.prototype.internal.render.renderSortIcon = function (target, cellData) {
+
         var self = this,
             int = self.internal,
-            render = int.render;
-        if (sorted && d.textWidth > d.cellPadding + render.sortIconSize) {
-            target.append("g")
-                .datum(d.sortIcon)
-                .attr("class", "sg-no-style--sort-icon-selector")
-                .attr("transform", "translate(" + (d.x + d.cellPadding + render.sortIconSize / 2) + "," + (d.y + d.textHeight / 2) + ")")
-                .call(function (d) { return render.sortIcon.call(self, d); });
+            render = int.render,
+            size = render.sortIconSize,
+            sorted = !(!cellData.sortIcon || cellData.sortIcon === 'none'),
+            icon,
+            measured,
+            selector = "sg-no-style--sorticon-selector";
+
+        // Always clear and redraw, this is because the add parameter will not be set
+        // if sorting has changed.
+        target.selectAll("." + selector).remove();
+
+        // If we are to display a sort icon
+        if (sorted && cellData.textWidth > cellData.cellPadding + render.sortIconSize) {
+
+            // Add a sort icon
+            icon = target.append("path").attr("class", selector + " " + this.style.sortIcon);
+
+            // Render an up or down arrow
+            if (cellData.sortIcon === 'asc') {
+                icon.attr("d", "M " + (size / 2) + " 0 L " + size + " " + size + " L 0 " + size + " z");
+            } else if (cellData.sortIcon === 'desc') {
+                icon.attr("d", "M 0 0 L " + size + " 0 L " + (size / 2) + " " + size + " z");
+            }
+
+            // Transform into the correct position
+            measured = icon.node().getBBox();
+            icon.attr("transform", "translate(" + (cellData.cellPadding + render.sortIconSize / 2 + measured.width / -2) + "," + (cellData.textHeight / 2 + icon.node().getBBox().height / -2) + ")");
+
         }
 
     };
@@ -1070,17 +1101,31 @@
     // Copyright: 2015 AlignAlytics
     // License: "https://github.com/PMSI-AlignAlytics/scrollgrid/blob/master/MIT-LICENSE.txt"
     // Source: /src/internal/render/renderText.js
-    Scrollgrid.prototype.internal.render.renderText = function (d, target, sorted) {
+    Scrollgrid.prototype.internal.render.renderText = function (target, cellData, add) {
         var int = this.internal,
-            render = int.render;
-        d.getValue(d.rowIndex, d.columnIndex, function (value) {
-            if (d.formatter) {
-                target.text(d.formatter(value));
-            } else {
-                target.text(value);
-            }
-            render.cropText.call(this, target, d.textWidth - d.cellPadding - (sorted ? render.sortIconSize + d.cellPadding : 0));
-        });
+            render = int.render,
+            sorted = !(!cellData.sortIcon || cellData.sortIcon === 'none'),
+            textShape,
+            selector = "sg-no-style--foreground-selector";
+        if (add) {
+            target.append("text")
+                .attr("class", selector + " " + cellData.foregroundStyle)
+                .style("text-anchor", render.getTextAnchor.call(this, cellData))
+                .attr("dy", "0.35em")
+                .text(render.cellWaitText);
+        } else {
+            textShape = target.selectAll("." + selector)
+                .attr("x", render.getTextPosition.call(this, cellData))
+                .attr("y", cellData.boxHeight / 2);
+            cellData.getValue(cellData.rowIndex, cellData.columnIndex, function (value) {
+                if (cellData.formatter) {
+                    textShape.text(cellData.formatter(value));
+                } else {
+                    textShape.text(value);
+                }
+                render.cropText.call(this, textShape, cellData.textWidth - cellData.cellPadding - (sorted ? render.sortIconSize + cellData.cellPadding : 0));
+            });
+        }
     };
 
     // Copyright: 2015 AlignAlytics
@@ -1125,27 +1170,6 @@
             cellForegroundPrefix: 'sg-cell-foreground-',
             sortIcon: 'sg-sort-icon'
         };
-
-    };
-
-    // Copyright: 2015 AlignAlytics
-    // License: "https://github.com/PMSI-AlignAlytics/scrollgrid/blob/master/MIT-LICENSE.txt"
-    // Source: /src/internal/render/sortIcon.js
-    Scrollgrid.prototype.internal.render.sortIcon = function (group) {
-
-        var int = this.internal,
-            render = int.render,
-            size = render.sortIconSize,
-            icon = group.append("path").attr("class", this.style.sortIcon);
-
-        if (group.datum() === 'asc') {
-            icon.attr("d", "M " + (size / 2) + " 0 L " + size + " " + size + " L 0 " + size + " z");
-        } else if (group.datum() === 'desc') {
-            icon.attr("d", "M 0 0 L " + size + " 0 L " + (size / 2) + " " + size + " z");
-        }
-
-        // Center it around zero
-        icon.attr("transform", "translate(" + icon.node().getBBox().width / -2 + "," + icon.node().getBBox().height / -2 + ")");
 
     };
 
